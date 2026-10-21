@@ -52,37 +52,32 @@ export default function App() {
             <Tab.Navigator
               initialRouteName="Dashboard"
               screenOptions={({ route }) => ({
+                headerShown: false,
                 tabBarIcon: ({ focused, color, size }) => {
                   let iconName = 'view-dashboard';
                   if (route.name === 'Dashboard') {
                     iconName = focused ? 'view-dashboard' : 'view-dashboard-outline';
                   } else if (route.name === 'Device Details') {
-                    iconName = focused ? 'information' : 'information-outline';
+                    iconName = focused ? 'router-wireless' : 'router-wireless-settings';
                   } else if (route.name === 'Share Wi-Fi') {
                     iconName = focused ? 'qrcode-scan' : 'qrcode';
                   }
-                  return <MaterialCommunityIcons name={iconName} size={size} color={color} />;
+                  return <MaterialCommunityIcons name={iconName} size={24} color={color} />;
                 },
                 tabBarActiveTintColor: paperTheme.colors.primary,
                 tabBarInactiveTintColor: paperTheme.colors.onSurfaceVariant,
+                tabBarLabelStyle: {
+                  fontSize: 11,
+                  fontWeight: '600',
+                  marginTop: -2,
+                },
                 tabBarStyle: {
                   backgroundColor: paperTheme.colors.surface,
                   borderTopColor: paperTheme.colors.outline,
-                  height: 64,
-                  paddingBottom: 10,
+                  borderTopWidth: StyleSheet.hairlineWidth,
+                  height: 60,
+                  paddingBottom: 8,
                   paddingTop: 6,
-                },
-                headerStyle: {
-                  backgroundColor: paperTheme.colors.surface,
-                  elevation: 0,
-                  shadowOpacity: 0,
-                  borderBottomWidth: StyleSheet.hairlineWidth,
-                  borderBottomColor: paperTheme.colors.outline,
-                },
-                headerTintColor: paperTheme.colors.onSurface,
-                headerTitleStyle: {
-                  fontWeight: '700',
-                  fontSize: 18,
                 },
               })}
             >
@@ -90,7 +85,6 @@ export default function App() {
                 name="Dashboard"
                 component={DashboardScreen}
                 options={{
-                  title: 'MiFi Dashboard',
                   tabBarLabel: 'Dashboard',
                 }}
               />
@@ -98,7 +92,6 @@ export default function App() {
                 name="Device Details"
                 component={DeviceDetailsScreen}
                 options={{
-                  title: 'Device Details',
                   tabBarLabel: 'Hardware',
                 }}
               />
@@ -106,7 +99,6 @@ export default function App() {
                 name="Share Wi-Fi"
                 component={ShareWifiScreen}
                 options={{
-                  title: 'Share Wi-Fi',
                   tabBarLabel: 'Share Wi-Fi',
                 }}
               />

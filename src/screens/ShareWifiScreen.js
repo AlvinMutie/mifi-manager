@@ -1,232 +1,274 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, ScrollView } from 'react-native';
 import {
-  Card,
-  Text,
-  Button,
-  useTheme,
-  IconButton,
-  Snackbar,
+  StyleSheet,
+  View,
+  ScrollView,
+  TouchableOpacity,
   TextInput,
-  Surface,
-} from 'react-native-paper';
+  Dimensions,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Text, useTheme } from 'react-native-paper';
 import QRCode from 'react-native-qrcode-svg';
 import * as Clipboard from 'expo-clipboard';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from '../context/RouterContext';
+
+const { width } = Dimensions.get('window');
 
 export default function ShareWifiScreen() {
   const theme = useTheme();
   const { wifiData, refreshWifiCredentials } = useRouter();
 
   const [showPassword, setShowPassword] = useState(false);
-  const [snackbarMsg, setSnackbarMsg] = useState('');
-  const [snackbarVisible, setSnackbarVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastVisible, setToastVisible] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
-  // Allow manual fallback in case router admin password is required
   const [customSsid, setCustomSsid] = useState('');
   const [customPassword, setCustomPassword] = useState('');
 
   const ssid = customSsid || wifiData?.ssid || 'Huawei-MiFi';
   const password = customPassword || wifiData?.wpaKey || '12345678';
-  const securityType = wifiData?.securityMode || 'WPA';
+  const securityType = wifiData?.securityMode || 'WPA2-PSK';
 
-  // Standard Wi-Fi connection QR string format:
-  // WIFI:T:WPA;S:<SSID>;P:<PASSWORD>;;
+  // Standard Wi-Fi connection QR payload
   const wifiQrString = `WIFI:T:${securityType.includes('WPA') ? 'WPA' : 'nopass'};S:${ssid};P:${password};;`;
 
   const copyToClipboard = async (text, label) => {
     if (!text) return;
     await Clipboard.setStringAsync(text);
-    setSnackbarMsg(`Copied ${label} to clipboard!`);
-    setSnackbarVisible(true);
+    setToastMessage(`Copied ${label}`);
+    setToastVisible(true);
+    setTimeout(() => {
+      setToastVisible(false);
+    }, 2000);
   };
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
-      contentContainerStyle={styles.contentContainer}
-    >
-      {/* QR Code Presentation Card */}
-      <Card style={[styles.qrCard, { backgroundColor: theme.colors.surface }]} mode="elevated">
-        <Card.Content style={styles.qrCardContent}>
-          <Text variant="titleLarge" style={{ fontWeight: '800', textAlign: 'center', marginBottom: 4 }}>
-            Scan to Join Wi-Fi
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
+      {/* iOS Floating Capsule Toast */}
+      {toastVisible && (
+        <View style={[styles.iosFloatingToast, { backgroundColor: theme.colors.surfaceVariant }]}>
+          <MaterialCommunityIcons name="check-circle" size={16} color="#34C759" />
+          <Text style={[styles.iosToastText, { color: theme.colors.onSurface }]}>
+            {toastMessage}
           </Text>
-          <Text
-            variant="bodyMedium"
-            style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center', marginBottom: 20 }}
-          >
-            Point any phone camera to instantly connect to this MiFi hotspot
+        </View>
+      )}
+
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* iOS Large Title Header */}
+        <View style={styles.headerContainer}>
+          <Text variant="labelSmall" style={styles.eyebrow}>
+            NETWORK ACCESS
           </Text>
+          <Text style={[styles.largeTitle, { color: theme.colors.onSurface }]}>Share Wi-Fi</Text>
+        </View>
 
-          {/* QR Code container with rounded white frame */}
-          <Surface style={styles.qrContainer} elevation={4}>
-            <QRCode
-              value={wifiQrString}
-              size={210}
-              backgroundColor="#ffffff"
-              color="#090d16"
-              logoBackgroundColor="transparent"
-            />
-          </Surface>
-
-          {/* Network SSID Badge */}
-          <View style={[styles.ssidBadge, { backgroundColor: theme.colors.surfaceVariant }]}>
-            <MaterialCommunityIcons name="wifi" size={20} color={theme.colors.primary} />
-            <Text
-              variant="titleMedium"
-              style={{ fontWeight: '700', marginLeft: 8, color: theme.colors.onSurface }}
-            >
-              {ssid}
-            </Text>
+        {/* Hero Apple Wallet-Style "Wi-Fi Pass" Card */}
+        <View style={[styles.wifiPassCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.outline }]}>
+          {/* Card Top Banner */}
+          <View style={styles.passHeader}>
+            <View style={[styles.passBadgeCircle, { backgroundColor: 'rgba(0, 122, 255, 0.12)' }]}>
+              <MaterialCommunityIcons name="wifi" size={20} color="#007AFF" />
+            </View>
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={styles.passEyebrow}>DIGITAL ACCESS PASS</Text>
+              <Text style={[styles.passSsidTitle, { color: theme.colors.onSurface }]} numberOfLines={1}>
+                {ssid}
+              </Text>
+            </View>
           </View>
-        </Card.Content>
-      </Card>
 
-      {/* WiFi Credentials & Copy Action Card */}
-      <Card style={[styles.card, { backgroundColor: theme.colors.surface }]} mode="elevated">
-        <Card.Title
-          title="Network Credentials"
-          titleVariant="titleMedium"
-          right={(props) => (
-            <IconButton
-              {...props}
-              icon={isEditing ? 'check' : 'pencil-outline'}
-              onPress={() => setIsEditing(!isEditing)}
-            />
-          )}
-        />
-        <Card.Content>
+          {/* QR Code Container */}
+          <View style={styles.qrFrameWrapper}>
+            <View style={styles.qrInnerFrame}>
+              <QRCode
+                value={wifiQrString}
+                size={Math.min(width - 120, 210)}
+                backgroundColor="#FFFFFF"
+                color="#000000"
+              />
+            </View>
+          </View>
+
+          <Text style={styles.qrHintText}>
+            Point any mobile camera at this code to join automatically
+          </Text>
+        </View>
+
+        {/* Primary Action Button: Copy Password */}
+        <TouchableOpacity
+          style={[styles.iosPrimaryActionButton, { backgroundColor: theme.colors.primary }]}
+          onPress={() => copyToClipboard(password, 'Password')}
+          activeOpacity={0.8}
+        >
+          <MaterialCommunityIcons name="content-copy" size={18} color="#FFFFFF" />
+          <Text style={styles.iosPrimaryActionText}>Copy Password</Text>
+        </TouchableOpacity>
+
+        {/* Section: Credentials */}
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionHeader}>NETWORK CREDENTIALS</Text>
+          <TouchableOpacity onPress={() => setIsEditing(!isEditing)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={[styles.sectionEditAction, { color: theme.colors.primary }]}>
+              {isEditing ? 'Done' : 'Edit'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Inset Grouped Table for Credentials */}
+        <View style={[styles.iosGroupedCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.outline }]}>
           {isEditing ? (
-            <View style={{ marginBottom: 12 }}>
+            <View style={styles.editFormPadding}>
+              <Text style={[styles.inputFieldLabel, { color: theme.colors.onSurfaceVariant }]}>NETWORK NAME (SSID)</Text>
               <TextInput
-                label="Network Name (SSID)"
+                style={[
+                  styles.iosTextInput,
+                  {
+                    backgroundColor: theme.colors.surfaceVariant,
+                    color: theme.colors.onSurface,
+                    borderColor: theme.colors.outline,
+                  },
+                ]}
                 value={customSsid || ssid}
                 onChangeText={setCustomSsid}
-                mode="outlined"
-                style={{ marginBottom: 10 }}
-                dense
+                placeholder="SSID"
+                placeholderTextColor="#8E8E93"
               />
+              <Text style={[styles.inputFieldLabel, { color: theme.colors.onSurfaceVariant, marginTop: 12 }]}>
+                WI-FI PASSWORD
+              </Text>
               <TextInput
-                label="Wi-Fi Password (WPA Key)"
+                style={[
+                  styles.iosTextInput,
+                  {
+                    backgroundColor: theme.colors.surfaceVariant,
+                    color: theme.colors.onSurface,
+                    borderColor: theme.colors.outline,
+                  },
+                ]}
                 value={customPassword || password}
                 onChangeText={setCustomPassword}
-                mode="outlined"
-                secureTextEntry={!showPassword}
-                right={
-                  <TextInput.Icon
-                    icon={showPassword ? 'eye-off' : 'eye'}
-                    onPress={() => setShowPassword(!showPassword)}
-                  />
-                }
-                dense
+                placeholder="Password"
+                placeholderTextColor="#8E8E93"
               />
             </View>
           ) : (
             <>
-              {/* SSID Row */}
-              <View style={styles.credRow}>
-                <View style={{ flex: 1 }}>
-                  <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
-                    NETWORK NAME (SSID)
-                  </Text>
-                  <Text variant="bodyLarge" style={{ fontWeight: '600' }}>
+              {/* Row 1: SSID */}
+              <View style={styles.iosRow}>
+                <View style={[styles.iosIconBadge, { backgroundColor: '#007AFF' }]}>
+                  <MaterialCommunityIcons name="wifi" size={18} color="#FFFFFF" />
+                </View>
+                <Text style={[styles.iosRowLabel, { color: theme.colors.onSurface }]}>Network Name</Text>
+                <View style={styles.iosRowRight}>
+                  <Text style={[styles.iosRowValue, { color: theme.colors.onSurfaceVariant }]}>
                     {ssid}
                   </Text>
+                  <TouchableOpacity
+                    onPress={() => copyToClipboard(ssid, 'Network Name')}
+                    style={styles.copyIconWrapper}
+                  >
+                    <MaterialCommunityIcons name="content-copy" size={16} color={theme.colors.primary} />
+                  </TouchableOpacity>
                 </View>
-                <IconButton
-                  icon="content-copy"
-                  size={20}
-                  iconColor={theme.colors.primary}
-                  onPress={() => copyToClipboard(ssid, 'Network SSID')}
-                />
               </View>
 
-              {/* Password Row */}
-              <View style={[styles.credRow, { marginTop: 12 }]}>
-                <View style={{ flex: 1 }}>
-                  <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
-                    PASSWORD (WPA KEY)
-                  </Text>
-                  <Text variant="bodyLarge" style={{ fontWeight: '600', letterSpacing: showPassword ? 0 : 2 }}>
+              <View style={[styles.iosDivider, { backgroundColor: theme.colors.outline }]} />
+
+              {/* Row 2: Password */}
+              <View style={styles.iosRow}>
+                <View style={[styles.iosIconBadge, { backgroundColor: '#34C759' }]}>
+                  <MaterialCommunityIcons name="key-variant" size={18} color="#FFFFFF" />
+                </View>
+                <Text style={[styles.iosRowLabel, { color: theme.colors.onSurface }]}>Password</Text>
+                <View style={styles.iosRowRight}>
+                  <Text
+                    style={[
+                      styles.iosRowValue,
+                      {
+                        color: theme.colors.onSurfaceVariant,
+                        letterSpacing: showPassword ? 0 : 2,
+                      },
+                    ]}
+                  >
                     {showPassword ? password : '••••••••••••'}
                   </Text>
+                  <TouchableOpacity
+                    onPress={() => setShowPassword(!showPassword)}
+                    style={styles.copyIconWrapper}
+                  >
+                    <MaterialCommunityIcons
+                      name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                      size={17}
+                      color="#8E8E93"
+                    />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => copyToClipboard(password, 'Password')}
+                    style={styles.copyIconWrapper}
+                  >
+                    <MaterialCommunityIcons name="content-copy" size={16} color={theme.colors.primary} />
+                  </TouchableOpacity>
                 </View>
-                <IconButton
-                  icon={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                  size={20}
-                  iconColor={theme.colors.onSurfaceVariant}
-                  onPress={() => setShowPassword(!showPassword)}
-                />
-                <IconButton
-                  icon="content-copy"
-                  size={20}
-                  iconColor={theme.colors.primary}
-                  onPress={() => copyToClipboard(password, 'Wi-Fi Password')}
-                />
+              </View>
+
+              <View style={[styles.iosDivider, { backgroundColor: theme.colors.outline }]} />
+
+              {/* Row 3: Security */}
+              <View style={styles.iosRow}>
+                <View style={[styles.iosIconBadge, { backgroundColor: '#5856D6' }]}>
+                  <MaterialCommunityIcons name="shield-check" size={18} color="#FFFFFF" />
+                </View>
+                <Text style={[styles.iosRowLabel, { color: theme.colors.onSurface }]}>Security</Text>
+                <View style={styles.iosRowRight}>
+                  <Text style={[styles.iosRowValue, { color: theme.colors.onSurfaceVariant }]}>
+                    {securityType}
+                  </Text>
+                </View>
               </View>
             </>
           )}
+        </View>
 
-          {/* Primary Action Button: Copy Password */}
-          <Button
-            mode="contained"
-            icon="clipboard-text-outline"
-            onPress={() => copyToClipboard(password, 'Wi-Fi Password')}
-            style={styles.copyButton}
-            contentStyle={{ height: 48 }}
-          >
-            Copy Password
-          </Button>
-
-          {/* Sync / Refresh Credentials */}
-          <Button
-            mode="text"
-            icon="sync"
-            onPress={() => refreshWifiCredentials()}
-            style={{ marginTop: 8 }}
-            textColor={theme.colors.primary}
-          >
-            Reload From Router
-          </Button>
-        </Card.Content>
-      </Card>
-
-      {/* Instructions Card */}
-      <Card style={[styles.card, { backgroundColor: theme.colors.surface }]} mode="elevated">
-        <Card.Title title="How to Connect" titleVariant="titleMedium" />
-        <Card.Content>
-          <View style={styles.instructionStep}>
-            <MaterialCommunityIcons name="camera" size={22} color={theme.colors.secondary} />
-            <Text variant="bodySmall" style={styles.stepText}>
-              1. Open the Camera app on an iPhone or Android phone.
+        {/* Section: How to Connect */}
+        <Text style={styles.sectionHeader}>HOW GUESTS JOIN</Text>
+        <View style={[styles.iosGroupedCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.outline }]}>
+          <View style={styles.instructionRow}>
+            <View style={[styles.stepNumberBadge, { backgroundColor: 'rgba(0, 122, 255, 0.12)' }]}>
+              <Text style={styles.stepNumberText}>1</Text>
+            </View>
+            <Text style={[styles.instructionText, { color: theme.colors.onSurface }]}>
+              Open the native Camera app on iOS or Android.
             </Text>
           </View>
-          <View style={styles.instructionStep}>
-            <MaterialCommunityIcons name="qrcode-scan" size={22} color={theme.colors.secondary} />
-            <Text variant="bodySmall" style={styles.stepText}>
-              2. Align the viewfinder over the QR code above.
+          <View style={[styles.iosDivider, { backgroundColor: theme.colors.outline }]} />
+          <View style={styles.instructionRow}>
+            <View style={[styles.stepNumberBadge, { backgroundColor: 'rgba(0, 122, 255, 0.12)' }]}>
+              <Text style={styles.stepNumberText}>2</Text>
+            </View>
+            <Text style={[styles.instructionText, { color: theme.colors.onSurface }]}>
+              Frame the QR code inside the viewfinder.
             </Text>
           </View>
-          <View style={styles.instructionStep}>
-            <MaterialCommunityIcons name="wifi-check" size={22} color={theme.colors.secondary} />
-            <Text variant="bodySmall" style={styles.stepText}>
-              3. Tap the prompt banner to instantly connect without entering passwords.
+          <View style={[styles.iosDivider, { backgroundColor: theme.colors.outline }]} />
+          <View style={styles.instructionRow}>
+            <View style={[styles.stepNumberBadge, { backgroundColor: 'rgba(52, 199, 89, 0.12)' }]}>
+              <Text style={[styles.stepNumberText, { color: '#34C759' }]}>3</Text>
+            </View>
+            <Text style={[styles.instructionText, { color: theme.colors.onSurface }]}>
+              Tap the banner to connect without typing passwords.
             </Text>
           </View>
-        </Card.Content>
-      </Card>
-
-      <Snackbar
-        visible={snackbarVisible}
-        onDismiss={() => setSnackbarVisible(false)}
-        duration={2500}
-      >
-        {snackbarMsg}
-      </Snackbar>
-    </ScrollView>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -235,52 +277,220 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    padding: 16,
-    paddingBottom: 32,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 40,
   },
-  qrCard: {
-    borderRadius: 20,
+  headerContainer: {
     marginBottom: 16,
   },
-  qrCardContent: {
-    alignItems: 'center',
-    paddingVertical: 12,
+  eyebrow: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    color: '#8E8E93',
+    marginBottom: 4,
   },
-  qrContainer: {
-    padding: 16,
-    borderRadius: 16,
-    backgroundColor: '#ffffff',
+  largeTitle: {
+    fontSize: 34,
+    fontWeight: '800',
+    letterSpacing: 0.35,
+  },
+  wifiPassCard: {
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
     alignItems: 'center',
-    justifyContent: 'center',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  passHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
     marginBottom: 18,
   },
-  ssidBadge: {
+  passBadgeCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  passEyebrow: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    color: '#8E8E93',
+  },
+  passSsidTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  qrFrameWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  qrInnerFrame: {
+    padding: 16,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  qrHintText: {
+    fontSize: 13,
+    color: '#8E8E93',
+    textAlign: 'center',
+    maxWidth: '85%',
+    lineHeight: 18,
+  },
+  iosPrimaryActionButton: {
+    height: 50,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  iosPrimaryActionText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    marginLeft: 8,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+    marginHorizontal: 6,
+  },
+  sectionHeader: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#8E8E93',
+    letterSpacing: 0.5,
+  },
+  sectionEditAction: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  iosGroupedCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    overflow: 'hidden',
+    marginBottom: 20,
+  },
+  iosRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingVertical: 13,
   },
-  card: {
-    borderRadius: 16,
-    marginBottom: 16,
-  },
-  credRow: {
-    flexDirection: 'row',
+  iosIconBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
   },
-  copyButton: {
-    marginTop: 18,
-    borderRadius: 12,
-  },
-  instructionStep: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  stepText: {
+  iosRowLabel: {
+    fontSize: 16,
+    fontWeight: '500',
     flex: 1,
-    marginLeft: 12,
-    color: '#9ca3af',
+  },
+  iosRowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  iosRowValue: {
+    fontSize: 15,
+    fontWeight: '400',
+  },
+  copyIconWrapper: {
+    marginLeft: 10,
+    padding: 2,
+  },
+  iosDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 60,
+  },
+  instructionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  stepNumberBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  stepNumberText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#007AFF',
+  },
+  instructionText: {
+    fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
+    lineHeight: 19,
+  },
+  editFormPadding: {
+    padding: 16,
+  },
+  inputFieldLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  iosTextInput: {
+    height: 44,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    fontSize: 15,
+    borderWidth: 1,
+  },
+  iosFloatingToast: {
+    position: 'absolute',
+    top: 50,
+    alignSelf: 'center',
+    zIndex: 999,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  iosToastText: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });

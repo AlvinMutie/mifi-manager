@@ -1,20 +1,20 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, ScrollView, RefreshControl } from 'react-native';
 import {
-  Card,
-  Text,
-  Button,
-  Chip,
-  ProgressBar,
+  StyleSheet,
+  View,
+  ScrollView,
+  RefreshControl,
+  TouchableOpacity,
   Switch,
-  IconButton,
-  Surface,
-  useTheme,
-  ActivityIndicator,
-  Banner,
-} from 'react-native-paper';
+  Dimensions,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Text, useTheme, ActivityIndicator } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import Svg, { Circle, G } from 'react-native-svg';
 import { useRouter } from '../context/RouterContext';
+
+const { width } = Dimensions.get('window');
 
 export default function DashboardScreen() {
   const theme = useTheme();
@@ -25,7 +25,6 @@ export default function DashboardScreen() {
     isMockMode,
     connectionError,
     lastUpdated,
-    detectionMessage,
     refreshStatus,
     runAutoDetect,
     toggleMockMode,
@@ -39,14 +38,26 @@ export default function DashboardScreen() {
     setRefreshing(false);
   };
 
-  // Battery color helper
+  // Battery metrics & colors (iOS system colors)
+  const batteryPercent = status?.batteryPercent ?? 0;
+  const isCharging = status?.isCharging ?? false;
+
   const getBatteryColor = (percent) => {
-    if (percent > 50) return '#10b981'; // Green
-    if (percent > 20) return '#f59e0b'; // Amber
-    return '#ef4444'; // Red
+    if (percent > 40) return '#34C759'; // iOS Green
+    if (percent > 20) return '#FF9500'; // iOS Orange
+    return '#FF3B30'; // iOS Red
   };
 
-  // Signal bars component
+  const batteryColor = getBatteryColor(batteryPercent);
+
+  // SVG Circular Battery Ring calculations
+  const ringSize = 136;
+  const strokeWidth = 12;
+  const radius = (ringSize - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (circumference * Math.min(Math.max(batteryPercent, 0), 100)) / 100;
+
+  // Signal bars component (iOS Style)
   const renderSignalBars = (strength = 0) => {
     const bars = [1, 2, 3, 4, 5];
     return (
@@ -59,9 +70,9 @@ export default function DashboardScreen() {
               style={[
                 styles.signalBar,
                 {
-                  height: 6 + bar * 4,
+                  height: 5 + bar * 4,
                   backgroundColor: isActive ? theme.colors.primary : theme.colors.outline,
-                  opacity: isActive ? 1 : 0.4,
+                  opacity: isActive ? 1 : 0.35,
                 },
               ]}
             />
@@ -71,26 +82,12 @@ export default function DashboardScreen() {
     );
   };
 
-  // Sim Status details
-  const getSimChipInfo = (simStatus) => {
-    switch (simStatus) {
-      case 'ready':
-        return { label: 'SIM Ready', icon: 'sim', color: '#10b981' };
-      case 'missing':
-        return { label: 'No SIM Inserted', icon: 'sim-alert', color: '#ef4444' };
-      case 'pin_required':
-        return { label: 'PIN Locked', icon: 'lock-alert', color: '#f59e0b' };
-      default:
-        return { label: 'SIM Error', icon: 'alert-circle', color: '#ef4444' };
-    }
-  };
-
-  const simInfo = getSimChipInfo(status?.simStatus || 'ready');
-
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
-      contentContainerStyle={styles.contentContainer}
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
+      <ScrollView
+        style={[styles.container, { backgroundColor: theme.colors.background }]}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -100,239 +97,263 @@ export default function DashboardScreen() {
         />
       }
     >
-      {/* Top Status & Brand Header */}
-      <Surface style={[styles.headerCard, { backgroundColor: theme.colors.surface }]} elevation={2}>
+      {/* Top Header Section (iOS Large Title Style) */}
+      <View style={styles.headerContainer}>
         <View style={styles.headerRow}>
-          <View style={styles.headerLeft}>
-            <Text variant="titleMedium" style={{ fontWeight: '700', color: theme.colors.onSurface }}>
-              {activeAdapter?.name || 'MiFi Router'}
-            </Text>
-            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-              Gateway: {activeAdapter?.gatewayIp || '192.168.8.1'}
-            </Text>
-          </View>
-
-          <View style={styles.headerRight}>
-            <Chip
-              icon={isMockMode ? 'flask-outline' : 'wifi-check'}
-              style={{
-                backgroundColor: isMockMode ? '#8b5cf622' : '#10b98122',
-              }}
-              textStyle={{
-                color: isMockMode ? '#a78bfa' : '#34d399',
-                fontSize: 12,
-                fontWeight: '600',
-              }}
+          <Text variant="labelSmall" style={styles.eyebrow}>
+            {activeAdapter?.name || 'HUAWEI HILINK'}
+          </Text>
+          <View
+            style={[
+              styles.pillBadge,
+              {
+                backgroundColor: isMockMode
+                  ? 'rgba(175, 82, 222, 0.15)'
+                  : connectionError
+                  ? 'rgba(255, 59, 48, 0.15)'
+                  : 'rgba(52, 199, 89, 0.15)',
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.pillDot,
+                {
+                  backgroundColor: isMockMode
+                    ? '#AF52DE'
+                    : connectionError
+                    ? '#FF3B30'
+                    : '#34C759',
+                },
+              ]}
+            />
+            <Text
+              style={[
+                styles.pillText,
+                {
+                  color: isMockMode
+                    ? '#BF5AF2'
+                    : connectionError
+                    ? '#FF453A'
+                    : '#30D158',
+                },
+              ]}
             >
-              {isMockMode ? 'Demo Mode' : 'Live Gateway'}
-            </Chip>
+              {isMockMode ? 'Demo Mode' : connectionError ? 'Offline' : 'Live Sync'}
+            </Text>
           </View>
         </View>
+        <Text style={[styles.largeTitle, { color: theme.colors.onSurface }]}>Dashboard</Text>
+      </View>
 
-        {/* Demo Mode Toggle Switch */}
-        <View style={styles.mockToggleRow}>
-          <View style={styles.mockToggleText}>
-            <Text variant="labelMedium" style={{ color: theme.colors.onSurface }}>
-              Simulate Live Data (Demo)
+      {/* Hero Circular Battery Card (iOS Fitness/Widget Aesthetic) */}
+      <View style={[styles.iosCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.outline }]}>
+        <View style={styles.heroRow}>
+          {/* Radial Ring */}
+          <View style={styles.ringWrapper}>
+            <Svg width={ringSize} height={ringSize}>
+              <G rotation="-90" origin={`${ringSize / 2}, ${ringSize / 2}`}>
+                {/* Background Ring Track */}
+                <Circle
+                  cx={ringSize / 2}
+                  cy={ringSize / 2}
+                  r={radius}
+                  stroke={theme.colors.surfaceVariant}
+                  strokeWidth={strokeWidth}
+                  fill="transparent"
+                />
+                {/* Dynamic Progress Ring */}
+                <Circle
+                  cx={ringSize / 2}
+                  cy={ringSize / 2}
+                  r={radius}
+                  stroke={batteryColor}
+                  strokeWidth={strokeWidth}
+                  strokeDasharray={circumference}
+                  strokeDashoffset={strokeDashoffset}
+                  strokeLinecap="round"
+                  fill="transparent"
+                />
+              </G>
+            </Svg>
+
+            {/* Centered Percent Display */}
+            <View style={styles.ringCenterContent}>
+              <Text style={[styles.ringPercentText, { color: theme.colors.onSurface }]}>
+                {batteryPercent}%
+              </Text>
+              {isCharging ? (
+                <View style={styles.chargingBadge}>
+                  <MaterialCommunityIcons name="lightning-bolt" size={13} color="#34C759" />
+                  <Text style={styles.chargingBadgeText}>CHARGING</Text>
+                </View>
+              ) : (
+                <Text style={styles.ringSublabel}>BATTERY</Text>
+              )}
+            </View>
+          </View>
+
+          {/* Right Summary Details */}
+          <View style={styles.heroDetails}>
+            <Text style={[styles.heroTitle, { color: theme.colors.onSurface }]}>
+              {isCharging ? 'Device Charging' : 'Battery Power'}
             </Text>
-            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, fontSize: 11 }}>
-              Test UI and 5s polling without physical router
+            <Text style={styles.heroSubtitle}>
+              {isCharging
+                ? 'Connected to power supply'
+                : batteryPercent > 20
+                ? 'Battery status normal'
+                : 'Low battery — connect charger'}
             </Text>
+
+            <View style={styles.heroStatChip}>
+              <MaterialCommunityIcons
+                name={isCharging ? 'power-plug' : 'battery-medium'}
+                size={16}
+                color={batteryColor}
+              />
+              <Text style={[styles.heroStatChipText, { color: theme.colors.onSurface }]}>
+                {batteryPercent}% Capacity
+              </Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* iOS Section Title */}
+      <Text style={styles.sectionHeader}>TELEMETRY & NETWORK</Text>
+
+      {/* 2x2 iOS Grid of Inset Metric Cards */}
+      <View style={styles.gridContainer}>
+        {/* Card 1: Cellular Signal */}
+        <View style={[styles.gridCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.outline }]}>
+          <View style={styles.gridHeader}>
+            <View style={[styles.iosIconCircle, { backgroundColor: 'rgba(0, 122, 255, 0.12)' }]}>
+              <MaterialCommunityIcons name="signal-cellular-outline" size={20} color="#007AFF" />
+            </View>
+            {renderSignalBars(status?.signalStrength ?? 0)}
+          </View>
+          <Text style={[styles.gridValue, { color: theme.colors.onSurface }]}>
+            {status?.networkType || '4G / LTE'}
+          </Text>
+          <Text style={styles.gridLabel}>
+            Cellular ({status?.signalStrength ?? 0}/5 Bars)
+          </Text>
+        </View>
+
+        {/* Card 2: SIM Card Status */}
+        <View style={[styles.gridCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.outline }]}>
+          <View style={styles.gridHeader}>
+            <View
+              style={[
+                styles.iosIconCircle,
+                {
+                  backgroundColor:
+                    status?.simStatus === 'ready'
+                      ? 'rgba(52, 199, 89, 0.12)'
+                      : 'rgba(255, 59, 48, 0.12)',
+                },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name={status?.simStatus === 'ready' ? 'sim' : 'sim-alert'}
+                size={20}
+                color={status?.simStatus === 'ready' ? '#34C759' : '#FF3B30'}
+              />
+            </View>
+          </View>
+          <Text
+            style={[
+              styles.gridValue,
+              { color: status?.simStatus === 'ready' ? '#34C759' : '#FF3B30' },
+            ]}
+          >
+            {status?.simStatus === 'ready' ? 'SIM Ready' : 'SIM Error'}
+          </Text>
+          <Text style={styles.gridLabel}>Card Provisioned</Text>
+        </View>
+
+        {/* Card 3: Connected Wi-Fi Clients */}
+        <View style={[styles.gridCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.outline }]}>
+          <View style={styles.gridHeader}>
+            <View style={[styles.iosIconCircle, { backgroundColor: 'rgba(175, 82, 222, 0.12)' }]}>
+              <MaterialCommunityIcons name="devices" size={20} color="#AF52DE" />
+            </View>
+          </View>
+          <Text style={[styles.gridValue, { color: theme.colors.onSurface }]}>
+            {status?.connectedDevices ?? 1} {status?.connectedDevices === 1 ? 'Client' : 'Clients'}
+          </Text>
+          <Text style={styles.gridLabel}>Active on Wi-Fi</Text>
+        </View>
+
+        {/* Card 4: Gateway Status */}
+        <View style={[styles.gridCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.outline }]}>
+          <View style={styles.gridHeader}>
+            <View style={[styles.iosIconCircle, { backgroundColor: 'rgba(90, 200, 250, 0.12)' }]}>
+              <MaterialCommunityIcons name="router-wireless" size={20} color="#5AC8FA" />
+            </View>
+          </View>
+          <Text style={[styles.gridValue, { color: theme.colors.onSurface }]}>
+            {activeAdapter?.gatewayIp || '192.168.8.1'}
+          </Text>
+          <Text style={styles.gridLabel}>Gateway Subnet</Text>
+        </View>
+      </View>
+
+      {/* iOS Section Title */}
+      <Text style={styles.sectionHeader}>CONTROLS & SIMULATION</Text>
+
+      {/* iOS Inset Grouped Table View */}
+      <View style={[styles.iosGroupedCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.outline }]}>
+        {/* Row 1: Demo Switch */}
+        <View style={styles.iosRow}>
+          <View style={[styles.iosSettingsIcon, { backgroundColor: '#AF52DE' }]}>
+            <MaterialCommunityIcons name="flask" size={18} color="#FFFFFF" />
+          </View>
+          <View style={styles.iosRowContent}>
+            <Text style={[styles.iosRowTitle, { color: theme.colors.onSurface }]}>Demo Mode</Text>
+            <Text style={styles.iosRowSubtitle}>Simulate live metrics without physical MiFi</Text>
           </View>
           <Switch
             value={isMockMode}
             onValueChange={(val) => toggleMockMode(val)}
-            color={theme.colors.primary}
+            trackColor={{ false: theme.colors.outline, true: '#34C759' }}
+            thumbColor="#FFFFFF"
           />
         </View>
-      </Surface>
 
-      {/* Auto-detection or Offline notification banner */}
-      {isDetecting ? (
-        <Surface style={[styles.detectingBox, { backgroundColor: theme.colors.surfaceVariant }]}>
-          <ActivityIndicator animating size="small" color={theme.colors.primary} />
-          <Text variant="bodySmall" style={{ marginLeft: 10, color: theme.colors.onSurfaceVariant }}>
-            {detectionMessage}
-          </Text>
-        </Surface>
-      ) : connectionError && !isMockMode ? (
-        <Banner
-          visible
-          actions={[
-            {
-              label: 'Turn on Demo Mode',
-              onPress: () => toggleMockMode(true),
-            },
-            {
-              label: 'Retry Gateway',
-              onPress: () => runAutoDetect(),
-            },
-          ]}
-          icon="wifi-off"
-          style={{ borderRadius: 12, marginBottom: 16 }}
+        <View style={[styles.iosDivider, { backgroundColor: theme.colors.outline }]} />
+
+        {/* Row 2: Re-Scan Gateways */}
+        <TouchableOpacity
+          style={styles.iosRow}
+          onPress={() => runAutoDetect()}
+          activeOpacity={0.7}
+          disabled={isDetecting}
         >
-          {connectionError}. Ensure your phone is connected to the MiFi router Wi-Fi, or switch to Demo Mode.
-        </Banner>
-      ) : null}
-
-      {/* Polling indicator bar */}
-      <View style={styles.pollingStatusRow}>
-        <View style={styles.livePulseDot} />
-        <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant, flex: 1 }}>
-          Live: Polling every 5 seconds
-        </Text>
-        {lastUpdated ? (
-          <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
-            Updated: {new Date(lastUpdated).toLocaleTimeString()}
-          </Text>
-        ) : null}
-        <IconButton
-          icon="refresh"
-          size={18}
-          iconColor={theme.colors.primary}
-          onPress={onManualRefresh}
-          style={{ margin: 0, padding: 0 }}
-        />
+          <View style={[styles.iosSettingsIcon, { backgroundColor: '#007AFF' }]}>
+            {isDetecting ? (
+              <ActivityIndicator size={16} color="#FFFFFF" />
+            ) : (
+              <MaterialCommunityIcons name="radar" size={18} color="#FFFFFF" />
+            )}
+          </View>
+          <View style={styles.iosRowContent}>
+            <Text style={[styles.iosRowTitle, { color: theme.colors.onSurface }]}>
+              {isDetecting ? 'Scanning Subnets...' : 'Re-Scan Local Gateways'}
+            </Text>
+            <Text style={styles.iosRowSubtitle}>Probe 192.168.8.1, 100.1, 1.1</Text>
+          </View>
+          <MaterialCommunityIcons name="chevron-right" size={20} color={theme.colors.onSurfaceVariant} />
+        </TouchableOpacity>
       </View>
 
-      {/* Metric 1: Battery Card */}
-      <Card style={[styles.metricCard, { backgroundColor: theme.colors.surface }]} mode="elevated">
-        <Card.Content>
-          <View style={styles.metricCardHeader}>
-            <View style={styles.iconCircle}>
-              <MaterialCommunityIcons
-                name={
-                  status?.isCharging
-                    ? 'battery-charging'
-                    : (status?.batteryPercent || 0) > 20
-                    ? 'battery'
-                    : 'battery-alert'
-                }
-                size={28}
-                color={getBatteryColor(status?.batteryPercent || 0)}
-              />
-            </View>
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text variant="titleMedium" style={{ fontWeight: '600' }}>
-                Battery Level
-              </Text>
-              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-                {status?.isCharging ? 'Device is currently charging' : 'Running on internal battery'}
-              </Text>
-            </View>
-            <Text
-              variant="headlineMedium"
-              style={{
-                fontWeight: '800',
-                color: getBatteryColor(status?.batteryPercent || 0),
-              }}
-            >
-              {status?.batteryPercent ?? '--'}%
-            </Text>
-          </View>
-
-          <ProgressBar
-            progress={(status?.batteryPercent || 0) / 100}
-            color={getBatteryColor(status?.batteryPercent || 0)}
-            style={styles.batteryProgressBar}
-          />
-        </Card.Content>
-      </Card>
-
-      {/* Metric 2: Cellular & SIM Card Card */}
-      <Card style={[styles.metricCard, { backgroundColor: theme.colors.surface }]} mode="elevated">
-        <Card.Content>
-          <View style={styles.metricCardHeader}>
-            <View style={styles.iconCircle}>
-              <MaterialCommunityIcons name="signal-cellular-3" size={28} color={theme.colors.primary} />
-            </View>
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text variant="titleMedium" style={{ fontWeight: '600' }}>
-                Cellular Signal
-              </Text>
-              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-                Network: {status?.networkType || 'Searching...'}
-              </Text>
-            </View>
-            {renderSignalBars(status?.signalStrength ?? 0)}
-          </View>
-
-          <View style={styles.simRow}>
-            <Chip
-              icon={simInfo.icon}
-              style={{ backgroundColor: `${simInfo.color}20` }}
-              textStyle={{ color: simInfo.color, fontWeight: '600' }}
-            >
-              {simInfo.label}
-            </Chip>
-
-            <Chip
-              icon="swap-vertical"
-              style={{ backgroundColor: theme.colors.surfaceVariant, marginLeft: 8 }}
-              textStyle={{ color: theme.colors.onSurface }}
-            >
-              {status?.networkType || '4G / LTE'}
-            </Chip>
-          </View>
-        </Card.Content>
-      </Card>
-
-      {/* Metric 3: Connection & Connected Clients */}
-      <Card style={[styles.metricCard, { backgroundColor: theme.colors.surface }]} mode="elevated">
-        <Card.Content>
-          <View style={styles.metricCardHeader}>
-            <View style={styles.iconCircle}>
-              <MaterialCommunityIcons name="devices" size={28} color={theme.colors.secondary} />
-            </View>
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text variant="titleMedium" style={{ fontWeight: '600' }}>
-                Connected Devices
-              </Text>
-              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-                Active MiFi Wi-Fi clients
-              </Text>
-            </View>
-            <Text variant="headlineMedium" style={{ fontWeight: '800', color: theme.colors.secondary }}>
-              {status?.connectedDevices ?? 1}
-            </Text>
-          </View>
-
-          <View style={styles.connectionDetailsRow}>
-            <View style={styles.statusBadge}>
-              <View
-                style={[
-                  styles.statusDot,
-                  {
-                    backgroundColor:
-                      status?.connectionStatus === 'connected'
-                        ? '#10b981'
-                        : status?.connectionStatus === 'connecting'
-                        ? '#f59e0b'
-                        : '#ef4444',
-                  },
-                ]}
-              />
-              <Text variant="bodyMedium" style={{ textTransform: 'capitalize', fontWeight: '500' }}>
-                Status: {status?.connectionStatus || 'Connected'}
-              </Text>
-            </View>
-          </View>
-        </Card.Content>
-      </Card>
-
-      {/* Re-Detect Gateway Button */}
-      <Button
-        mode="outlined"
-        icon="radar"
-        onPress={() => runAutoDetect()}
-        loading={isDetecting}
-        disabled={isDetecting}
-        style={styles.reDetectButton}
-        textColor={theme.colors.primary}
-      >
-        Re-Scan Local Gateways
-      </Button>
+      {/* Live Polling Caption */}
+      <Text style={styles.footerNote}>
+        Syncing with gateway every 5s • {lastUpdated ? `Updated ${new Date(lastUpdated).toLocaleTimeString()}` : 'Live'}
+      </Text>
     </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -341,114 +362,224 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    padding: 16,
-    paddingBottom: 32,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 40,
   },
-  headerCard: {
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 14,
+  headerContainer: {
+    marginBottom: 16,
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 4,
   },
-  headerLeft: {
-    flex: 1,
+  eyebrow: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    color: '#8E8E93',
   },
-  headerRight: {
-    marginLeft: 8,
-  },
-  mockToggleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#374151',
-  },
-  mockToggleText: {
-    flex: 1,
-  },
-  detectingBox: {
+  pillBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
   },
-  pollingStatusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    paddingHorizontal: 4,
+  pillDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
   },
-  livePulseDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#10b981',
-    marginRight: 8,
+  pillText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
-  metricCard: {
-    borderRadius: 16,
-    marginBottom: 14,
+  largeTitle: {
+    fontSize: 34,
+    fontWeight: '800',
+    letterSpacing: 0.35,
   },
-  metricCardHeader: {
+  iosCard: {
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  heroRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#1f2937',
+  ringWrapper: {
+    width: 136,
+    height: 136,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  batteryProgressBar: {
-    height: 8,
-    borderRadius: 4,
-    marginTop: 14,
-    backgroundColor: '#374151',
+  ringCenterContent: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ringPercentText: {
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  ringSublabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#8E8E93',
+    letterSpacing: 0.5,
+    marginTop: 2,
+  },
+  chargingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  chargingBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#34C759',
+    letterSpacing: 0.5,
+  },
+  heroDetails: {
+    flex: 1,
+    marginLeft: 18,
+  },
+  heroTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  heroSubtitle: {
+    fontSize: 13,
+    color: '#8E8E93',
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  heroStatChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(142, 142, 147, 0.12)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  heroStatChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+  sectionHeader: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#8E8E93',
+    letterSpacing: 0.5,
+    marginBottom: 10,
+    marginLeft: 6,
+  },
+  gridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  gridCard: {
+    width: (width - 44) / 2,
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  gridHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  iosIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gridValue: {
+    fontSize: 17,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  gridLabel: {
+    fontSize: 12,
+    color: '#8E8E93',
+    fontWeight: '500',
   },
   signalBarsContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    height: 28,
+    height: 25,
   },
   signalBar: {
-    width: 4,
-    marginHorizontal: 2,
+    width: 3.5,
+    marginHorizontal: 1.5,
     borderRadius: 2,
   },
-  simRow: {
-    flexDirection: 'row',
-    marginTop: 14,
+  iosGroupedCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    overflow: 'hidden',
+    marginBottom: 16,
   },
-  connectionDetailsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 14,
-    paddingTop: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#374151',
-  },
-  statusBadge: {
+  iosRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
-  statusDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: 8,
+  iosSettingsIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
   },
-  reDetectButton: {
-    marginTop: 8,
-    borderRadius: 12,
+  iosRowContent: {
+    flex: 1,
+  },
+  iosRowTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  iosRowSubtitle: {
+    fontSize: 12,
+    color: '#8E8E93',
+    marginTop: 2,
+  },
+  iosDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 60,
+  },
+  footerNote: {
+    textAlign: 'center',
+    fontSize: 12,
+    color: '#8E8E93',
+    marginTop: 4,
   },
 });
