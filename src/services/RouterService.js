@@ -1,7 +1,7 @@
 import { HuaweiAdapter } from './HuaweiAdapter';
 import { MockAdapter } from './MockAdapter';
 
-export const COMMON_GATEWAYS = ['192.168.8.1', '192.168.0.1', '192.168.1.1'];
+export const COMMON_GATEWAYS = ['192.168.8.1', '192.168.100.1', '192.168.1.1', '192.168.0.1', '192.168.43.1'];
 
 /**
  * RouterService coordinates adapter auto-detection, gateway probing,

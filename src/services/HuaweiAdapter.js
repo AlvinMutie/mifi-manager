@@ -39,7 +39,8 @@ export class HuaweiAdapter extends RouterAdapter {
    * Helper to perform authenticated GET/POST requests against the Huawei HiLink API
    */
   async request(endpoint, options = {}) {
-    const url = `http://${this.gatewayIp}${endpoint}`;
+    const protocol = this.gatewayIp.startsWith('http') ? '' : 'http://';
+    const url = `${protocol}${this.gatewayIp}${endpoint}`;
     const headers = {
       Accept: '*/*',
       'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -54,7 +55,7 @@ export class HuaweiAdapter extends RouterAdapter {
     }
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), options.timeoutMs || 4000);
+    const timeout = setTimeout(() => controller.abort(), options.timeoutMs || 3500);
 
     try {
       const response = await fetch(url, {
@@ -85,7 +86,7 @@ export class HuaweiAdapter extends RouterAdapter {
       clearTimeout(timeout);
 
       if (!text || !text.trim().startsWith('<')) {
-        throw new Error(`Unexpected non-XML response from ${endpoint}: ${text.slice(0, 100)}`);
+        throw new Error(`Non-XML response received from gateway (${this.gatewayIp})`);
       }
 
       const parsed = parser.parse(text);
@@ -100,6 +101,11 @@ export class HuaweiAdapter extends RouterAdapter {
       return parsed.response || parsed;
     } catch (err) {
       clearTimeout(timeout);
+      if (err.name === 'AbortError' || err.message?.includes('canceled')) {
+        const timeoutErr = new Error(`Connection to MiFi gateway at ${this.gatewayIp} timed out`);
+        timeoutErr.name = 'TimeoutError';
+        throw timeoutErr;
+      }
       throw err;
     }
   }
@@ -112,7 +118,7 @@ export class HuaweiAdapter extends RouterAdapter {
     try {
       // First attempt: /api/webserver/SesTokInfo (provides both Session and Token)
       try {
-        const sesTokData = await this.request('/api/webserver/SesTokInfo', { timeoutMs: 2500 });
+        const sesTokData = await this.request('/api/webserver/SesTokInfo', { timeoutMs: 3000 });
         if (sesTokData?.TokInfo) {
           this.token = String(sesTokData.TokInfo);
           if (sesTokData.SesInfo) {
@@ -124,14 +130,13 @@ export class HuaweiAdapter extends RouterAdapter {
         // Fall back to /api/webserver/token
       }
 
-      const data = await this.request('/api/webserver/token', { timeoutMs: 2500 });
+      const data = await this.request('/api/webserver/token', { timeoutMs: 3000 });
       if (data?.token) {
         this.token = String(data.token);
         return true;
       }
       return false;
     } catch (err) {
-      console.warn('Huawei authentication error:', err.message);
       return false;
     }
   }

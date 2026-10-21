@@ -25,7 +25,6 @@ export function RouterProvider({ children }) {
       setLastUpdated(Date.now());
       return data;
     } catch (err) {
-      console.warn('Status fetch warning:', err.message);
       setConnectionError(err.message || 'Unable to connect to router');
       return null;
     }
@@ -37,8 +36,7 @@ export function RouterProvider({ children }) {
       const info = await routerService.getDeviceInfo();
       setDeviceInfo(info);
       return info;
-    } catch (err) {
-      console.warn('Device info fetch warning:', err.message);
+    } catch {
       return null;
     }
   }, []);
@@ -49,8 +47,7 @@ export function RouterProvider({ children }) {
       const creds = await routerService.getWifiCredentials();
       setWifiData(creds);
       return creds;
-    } catch (err) {
-      console.warn('WiFi credentials fetch warning:', err.message);
+    } catch {
       return null;
     }
   }, []);
