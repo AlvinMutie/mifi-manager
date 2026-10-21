@@ -7,7 +7,6 @@ MiFi Manager is a mobile application built on the React Native and Expo framewor
 ## Table of Contents
 
 - [Motivation and Background](#motivation-and-background)
-- [Overview](#overview)
 - [Key Features](#key-features)
 - [Architecture](#architecture)
   - [Adapter Pattern Design](#adapter-pattern-design)
@@ -32,26 +31,20 @@ MiFi Manager is a mobile application built on the React Native and Expo framewor
 
 As the owner of a portable Huawei MiFi hotspot, I routinely needed a quick, reliable way to check how many client devices were connected to my personal network, verify battery health, and check cellular signal levels on the go.
 
-The standard way to access this information involves opening a mobile browser, navigating to `192.168.8.1`, and navigating through an outdated, unresponsive desktop-oriented web administration interface. 
+The standard way to access this information involves opening a mobile browser, navigating to `192.168.8.1`, and navigating through an outdated, unresponsive desktop-oriented web administration interface.
 
-Instead of creating another web dashboard, I engineered a dedicated mobile application that runs directly on mobile devices and queries the router over the local wireless link. MiFi Manager retrieves the operational telemetry needed—active connected clients, remaining battery percentage, cellular network generation, hardware specifications, and Wi-Fi security keys—and surfaces them through a clean, Apple iOS-inspired user interface.
-
----
-
-## Overview
-
-Portable cellular Wi-Fi devices (MiFis) expose internal HTTP/XML APIs on their default gateway subnets. MiFi Manager detects these devices on the local wireless network, authenticates sessions via verification tokens, continuously polls device telemetry (battery percentage, charging status, SIM status, cellular signal strength, network technology), and facilitates network sharing via generated QR codes.
+Instead of creating another web dashboard, I engineered a dedicated mobile application that runs directly on mobile devices and queries the router over the local wireless link. MiFi Manager retrieves the necessary operational telemetry, including active connected clients, battery percentage, cellular network generation, hardware specifications, and Wi-Fi security keys, presented through a clean and responsive mobile interface.
 
 ---
 
 ## Key Features
 
-- **Automated Gateway Discovery**: Probes common gateway subnets (`192.168.8.1`, `192.168.100.1`, `192.168.1.1`, `192.168.0.1`, `192.168.43.1`) upon application launch to dynamically resolve and attach the correct brand adapter.
-- **Real-Time Health Monitoring**: Polls router telemetry at 5-second intervals to display battery percentage, charging states, SIM validation states, network generation (`LTE / 4G`, `5G`, `3G`), signal strength bars, and active connected client counts.
-- **Hardware Inventory**: Extracts device serial details, IMEI, IMSI, firmware/software versions, hardware revisions, and WAN addresses with one-touch clipboard actions.
-- **Wi-Fi QR Sharing**: Reads SSID and WPA encryption keys from router configuration endpoints and encodes them into standard Wi-Fi connection strings (`WIFI:T:WPA;S:<SSID>;P:<KEY>;;`) rendered via scalable vector graphics.
-- **Dual-Mode Operation**: Includes an integrated offline mock adapter (`MockAdapter`) that simulates active telemetry fluctuations, allowing UI and functional testing in Expo Go without physical router hardware.
-- **Custom Gateway Routing**: Provides manual IP overrides for customized network subnets.
+- **Automated Gateway Discovery**: Probes common gateway subnets (`192.168.8.1`, `192.168.100.1`, `192.168.1.1`, `192.168.0.1`, `192.168.43.1`) upon launch to resolve and attach the matching adapter.
+- **Continuous Telemetry Polling**: Automatically refreshes device metrics on a 5-second interval while maintaining lightweight background state.
+- **Hardware Inventory**: Extracts device identifiers, serial numbers, firmware versions, and network addresses with one-touch clipboard copying.
+- **Wi-Fi QR Sharing**: Reads the SSID and security key from router configuration endpoints and formats them into a standard QR code string for guest access.
+- **Dual-Mode Operation**: Includes an integrated offline mock adapter (`MockAdapter`) that simulates telemetry fluctuations for interface validation without requiring physical hardware.
+- **Custom Gateway Routing**: Supports manual IP overrides for devices configured on customized subnets.
 
 ---
 
@@ -87,7 +80,7 @@ The service layer is structured around an abstract base class, `RouterAdapter`, 
 - **`RouterAdapter`**: Defines abstract methods for authentication, telemetry, hardware identification, and credential retrieval.
 - **`HuaweiAdapter`**: Concrete implementation parsing XML responses from Huawei HiLink endpoints and handling session verification tokens.
 - **`MockAdapter`**: Concrete simulation adapter emitting dynamic state variations for testing.
-- **`RouterService`**: Singleton manager managing gateway probing, adapter instantiation, and delegation.
+- **`RouterService`**: Singleton coordinator managing gateway probing, adapter instantiation, and delegation.
 
 ### Router Auto-Detection
 
@@ -99,7 +92,7 @@ Upon startup, `RouterService.detectRouter()` sequentially checks gateway IPs wit
 
 ### Authentication Flow
 
-1. **Session & Token Negotiation**:
+1. **Session and Token Negotiation**:
    - Queries `/api/webserver/SesTokInfo` or `/api/webserver/token`.
    - Parses the `<TokInfo>` or `<token>` element from the XML payload using `fast-xml-parser`.
    - Extracts session cookies (`SessionID=...`) from HTTP response headers.
@@ -122,9 +115,9 @@ Upon startup, `RouterService.detectRouter()` sequentially checks gateway IPs wit
 
 ## Screens and User Interface
 
-- **Dashboard Screen**: Features an SVG circular battery gauge (Apple Fitness/Battery Widget style), live telemetry indicators (Cellular bars, SIM readiness, Active connected client counter, and Subnet gateway), plus an iOS-style inset grouped section for Demo Mode toggling and gateway rescanning.
-- **Device Details Screen**: Styled after Apple's native Settings > About view, presenting hardware specs, firmware builds, IMEI/IMSI identifiers, MAC addresses, and a custom gateway override input with a floating Dynamic Island-style capsule HUD toast.
-- **Share Wi-Fi Screen**: Digital access pass layout featuring a framed vector QR code, an interactive credentials table with show/hide password toggle, and a primary action button to copy the plaintext password.
+- **Dashboard Screen**: Displays a circular SVG battery ring gauge, real-time signal strength bars, SIM card readiness, connected Wi-Fi device counter, and a toggle for offline demonstration mode.
+- **Device Details Screen**: Groups technical specifications into organized sections, covering hardware revisions, firmware versions, IMEI/IMSI numbers, MAC addresses, and a manual gateway input module.
+- **Share Wi-Fi Screen**: Formats credentials into a standard Wi-Fi connection string (`WIFI:T:WPA;S:<SSID>;P:<KEY>;;`), displayed via a vector QR code with show/hide password toggling and quick clipboard actions.
 
 ---
 
@@ -149,7 +142,7 @@ mifi/
 │   │   ├── MockAdapter.js         # Offline simulated adapter
 │   │   └── RouterService.js       # Gateway detector and service singleton
 │   └── theme/
-│       └── theme.js               # iOS Human Interface Guidelines color tokens
+│       └── theme.js               # Clean dark and light theme token definitions
 └── README.md                      # Technical documentation
 ```
 
@@ -157,9 +150,9 @@ mifi/
 
 ## Tech Stack
 
-- **Runtime & Tooling**: React Native, Expo SDK
+- **Runtime and Tooling**: React Native, Expo SDK
 - **Navigation**: React Navigation (Bottom Tabs Navigator)
-- **Component Library**: React Native Paper (Material Design 3 adapted to iOS aesthetics)
+- **Component Library**: React Native Paper (Material Design 3)
 - **Vector Icons**: Expo Vector Icons (Material Community Icons)
 - **QR Code Rendering**: `react-native-qrcode-svg`, `react-native-svg`
 - **Data Serialization**: `fast-xml-parser`
@@ -173,7 +166,7 @@ mifi/
 
 - Node.js (version 18 or higher recommended)
 - npm or yarn
-- A physical Android or iOS mobile device with the **Expo Go** application installed
+- An Android or iOS mobile device with the **Expo Go** application installed
 
 ### Installation
 
@@ -209,9 +202,9 @@ mifi/
 To interact with a physical portable MiFi:
 
 1. Ensure the MiFi device is powered on and broadcasting its wireless network.
-2. Connect both your mobile testing phone and your development workstation to the MiFi's Wi-Fi network.
+2. Connect both your mobile testing phone and your development workstation to the MiFi Wi-Fi network.
 3. In the application:
-   - Disable the **Simulate Live Data (Demo)** switch on the Dashboard.
+   - Disable the **Demo Mode** switch on the Dashboard.
    - Tap **Re-Scan Local Gateways** to initiate auto-detection.
 4. If your router uses a non-standard subnet (such as `192.168.100.1` or `192.168.1.1`), navigate to the **Device Details** screen, input the IP under **Custom Gateway Configuration**, and select **Connect**.
 
@@ -234,5 +227,5 @@ The resulting file will be available at `android/app/build/outputs/apk/release/a
 ## Configuration and Troubleshooting
 
 - **Incompatible SDK Version**: Ensure the Expo SDK specified in `package.json` aligns with the version supported by your installed Expo Go client on mobile. Run `npx expo install --fix` if dependency alignment is required.
-- **Connection Timeouts**: React Native aborts fetch requests when a destination IP is unreachable on the active wireless interface. Verify that the mobile device has not reverted to cellular data and remains connected to the router's local subnet.
+- **Connection Timeouts**: React Native aborts fetch requests when a destination IP is unreachable on the active wireless interface. Verify that the mobile device has not reverted to cellular data and remains connected to the router local subnet.
 - **Cleartext HTTP Traffic**: HiLink administrative interfaces operate over standard HTTP (`http://192.168.8.1`). Standalone release builds have `usesCleartextTraffic: true` configured in `app.json` to allow local HTTP requests.
