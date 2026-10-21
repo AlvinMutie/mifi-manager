@@ -1,70 +1,211 @@
-# 📶 MiFi Manager (React Native & Expo)
+# MiFi Manager
 
-A mobile application designed to manage, monitor, and interact with portable WiFi devices (MiFi) over a local network. Built with **React Native**, **Expo**, **React Navigation**, **React Native Paper**, and the **Adapter Pattern** for extensible multi-brand router support.
+MiFi Manager is a React Native mobile application built on the Expo framework, engineered to monitor, manage, and interact with portable Wi-Fi (MiFi) hotspot devices over local networks. The application implements an extensible Adapter Pattern architecture to interface with router administrative APIs, beginning with a complete implementation for Huawei HiLink devices.
 
 ---
 
-## 🚀 Getting Started with Expo Go (Beginner's Guide)
+## Table of Contents
 
-If you have never used Expo Go before, follow these simple steps to preview and test the app on your phone:
+- [Overview](#overview)
+- [Key Features](#key-features)
+- [Architecture](#architecture)
+  - [Adapter Pattern Design](#adapter-pattern-design)
+  - [Router Auto-Detection](#router-auto-detection)
+- [Huawei HiLink Implementation](#huawei-hilink-implementation)
+  - [Authentication Flow](#authentication-flow)
+  - [API Endpoints](#api-endpoints)
+- [Screens and User Interface](#screens-and-user-interface)
+- [Project Structure](#project-structure)
+- [Tech Stack](#tech-stack)
+- [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Installation](#installation)
+  - [Running with Expo Go](#running-with-expo-go)
+  - [Connecting to Physical Hardware](#connecting-to-physical-hardware)
+- [Configuration and Troubleshooting](#configuration-and-troubleshooting)
 
-### 1. Install Expo Go on Your Phone
-- **Android**: Install [Expo Go from Google Play](https://play.google.com/store/apps/details?id=host.exp.exponent)
-- **iOS**: Install [Expo Go from the App Store](https://apps.apple.com/app/expo-go/id982107772)
+---
 
-### 2. Start the Development Server
-In your terminal, navigate to the project directory and run:
+## Overview
 
-```bash
-npx expo start
+Portable cellular Wi-Fi devices (MiFis) expose internal HTTP/XML APIs on their default gateway subnets. MiFi Manager detects these devices on the local wireless network, authenticates sessions via verification tokens, continuously polls device health indicators (battery percentage, SIM status, cellular signal strength, network technology), and facilitates seamless network sharing via generated QR codes.
+
+---
+
+## Key Features
+
+- **Automated Gateway Discovery**: Probes common gateway subnets (`192.168.8.1`, `192.168.100.1`, `192.168.1.1`, `192.168.0.1`, `192.168.43.1`) upon application launch to dynamically resolve and attach the correct brand adapter.
+- **Real-Time Health Monitoring**: Polls router telemetry at 5-second intervals to display battery percentage, charging states, SIM validation states, network generation (`LTE / 4G`, `5G`, `3G`), signal strength bars, and active connected client counts.
+- **Hardware Inventory**: Extracts device serial details, IMEI, IMSI, firmware/software versions, hardware revisions, and WAN addresses with one-touch clipboard actions.
+- **Wi-Fi QR Sharing**: Reads SSID and WPA encryption keys from router configuration endpoints and encodes them into standard Wi-Fi connection strings (`WIFI:T:WPA;S:<SSID>;P:<KEY>;;`) rendered via scalable vector graphics.
+- **Dual-Mode Operation**: Includes an integrated offline mock adapter (`MockAdapter`) that simulates active telemetry fluctuations, allowing UI and functional testing in Expo Go without physical router hardware.
+- **Custom Gateway Routing**: Provides manual IP overrides for customized network subnets.
+
+---
+
+## Architecture
+
+### Adapter Pattern Design
+
+The service layer is structured around an abstract base class, `RouterAdapter`, establishing a uniform contract across diverse router brands and communication protocols.
+
+```
++-------------------------------------------------------------+
+|                        RouterService                        |
+|   (Auto-detection, Gateway Probing, Adapter Lifecycle)      |
++-------------------------------------------------------------+
+                               |
+                               v
++-------------------------------------------------------------+
+|                     RouterAdapter (Base)                    |
+|  - authenticate()                                           |
+|  - getStatus()                                              |
+|  - getDeviceInfo()                                          |
+|  - getWifiCredentials()                                     |
+|  - ping()                                                   |
++-------------------------------------------------------------+
+          |                                        |
+          v                                        v
++-------------------+                    +-------------------+
+|   HuaweiAdapter   |                    |    MockAdapter    |
+| (HiLink XML APIs) |                    | (Demo Simulation) |
++-------------------+                    +-------------------+
 ```
 
-### 3. Connect Your Phone
-- Make sure your computer and your phone are connected to the same Wi-Fi network (or connect your computer and phone to your portable MiFi hotspot!).
-- **Android**: Open the **Expo Go** app and tap **"Scan QR code"**, then scan the QR code displayed in your computer terminal.
-- **iOS**: Open the native **Camera** app, point it at the QR code in your terminal, and tap the **"Open in Expo Go"** banner.
+- **`RouterAdapter`**: Defines abstract methods for authentication, telemetry, hardware identification, and credential retrieval.
+- **`HuaweiAdapter`**: Concrete implementation parsing XML responses from Huawei HiLink endpoints and handling session verification tokens.
+- **`MockAdapter`**: Concrete simulation adapter emitting dynamic state variations for testing.
+- **`RouterService`**: Singleton manager managing gateway probing, adapter instantiation, and delegation.
 
-> **💡 Quick Tip - Testing without a physical router:**  
-> If you are not connected to a physical Huawei MiFi hotspot right now, turn on the **"Simulate Live Data (Demo)"** switch at the top of the **Dashboard** screen. This activates realistic fluctuating battery, 4G cellular signal, and connected device simulation so you can explore all screens, the QR code generator, and 5-second polling immediately.
+### Router Auto-Detection
 
----
-
-## 🏗️ Architecture & Features
-
-### 1. Adapter Pattern (`src/services/`)
-- [RouterAdapter.js](file:///home/blueberyy/Documents/mifi/src/services/RouterAdapter.js): Base abstract class enforcing the router contract (`authenticate()`, `getStatus()`, `getDeviceInfo()`, `getWifiCredentials()`, `ping()`).
-- [HuaweiAdapter.js](file:///home/blueberyy/Documents/mifi/src/services/HuaweiAdapter.js): HiLink XML implementation for Huawei MiFi routers (e.g., E5577, E5573, E5785, etc.):
-  - **Authentication**: Requests tokens via `/api/webserver/token` or `/api/webserver/SesTokInfo` and injects them into the `__RequestVerificationToken` header and session cookies.
-  - **Monitoring Status**: Polls `/api/monitoring/status` and translates raw XML into battery level, charging state, SIM status (`ready`, `missing`, `pin_required`), signal strength (0-5 bars), and active Wi-Fi clients.
-  - **Device Information**: Reads `/api/device/information` for IMEI, IMSI, hardware, software, and web UI versions.
-  - **Wi-Fi Credentials**: Extracts SSID from `/api/wlan/basic-settings` and WPA key from `/api/wlan/security-settings`.
-- [MockAdapter.js](file:///home/blueberyy/Documents/mifi/src/services/MockAdapter.js): Offline mock simulator with live metrics changes for development in Expo Go without physical hardware.
-- [RouterService.js](file:///home/blueberyy/Documents/mifi/src/services/RouterService.js): Singleton manager that auto-detects reachable router gateways (`192.168.8.1`, `192.168.0.1`, `192.168.1.1`) and dynamically instantiates the appropriate adapter.
-
-### 2. UI Screens (`src/screens/`)
-- **Dashboard Screen**:
-  - Real-time battery indicator with visual progress bar and charging status.
-  - Cellular signal card with 5-bar visual graph, network type (`LTE / 4G`), and SIM card badge.
-  - Connected Wi-Fi client count.
-  - 5-second polling loop managed via React hooks.
-  - Gateway status badge and Demo Mode toggle.
-- **Device Details Screen**:
-  - Displays hardware info: Device Name, IMEI, IMSI, Software/Firmware version, Hardware version, MAC address, and WAN IP.
-  - One-tap clipboard copy buttons for IMEI, MAC address, and Gateway IP.
-  - Custom Gateway input to connect to routers on custom subnets (e.g. `192.168.100.1`).
-- **Share Wi-Fi Screen**:
-  - Generates a standard Wi-Fi QR code (`WIFI:T:WPA;S:<SSID>;P:<PASSWORD>;;`) using `react-native-qrcode-svg`.
-  - Displays the SSID and masked WPA key with visibility toggle.
-  - **Copy Password** button powered by `expo-clipboard`.
-  - Guide on how friends can scan and join directly from camera apps.
+Upon startup, `RouterService.detectRouter()` sequentially checks gateway IPs with an `AbortController`-backed timeout. It queries identification endpoints (such as `/api/webserver/token`) to detect HiLink signatures and instantiates the matching adapter.
 
 ---
 
-## 🛠️ Tech Stack
-- **Framework**: [Expo SDK 58](https://expo.dev) / React Native 0.88
-- **Navigation**: [React Navigation 7](https://reactnavigation.org) (Bottom Tabs)
-- **UI & Theming**: [React Native Paper 5](https://callstack.github.io/react-native-paper/) (Material Design 3 dark/light palettes)
-- **QR Code**: [react-native-qrcode-svg](https://github.com/awesomejerry/react-native-qrcode-svg) + [react-native-svg](https://github.com/software-mansion/react-native-svg)
-- **XML Parsing**: [fast-xml-parser](https://github.com/NaturalIntelligence/fast-xml-parser)
-- **Clipboard**: [expo-clipboard](https://docs.expo.dev/versions/latest/sdk/clipboard/)
-# mifi-manager
+## Huawei HiLink Implementation
+
+### Authentication Flow
+
+1. **Session & Token Negotiation**:
+   - Queries `/api/webserver/SesTokInfo` or `/api/webserver/token`.
+   - Parses the `<TokInfo>` or `<token>` element from the XML payload.
+   - Extracts session cookies (`SessionID=...`) from HTTP response headers.
+2. **Request Verification**:
+   - Injects the extracted token into the `__RequestVerificationToken` header on all subsequent GET and POST API calls.
+   - Attaches session cookies to maintain authorized state.
+
+### API Endpoints
+
+| Endpoint | HTTP Method | Data Extracted |
+| :--- | :--- | :--- |
+| `/api/webserver/token` | GET | Verification token, Session headers |
+| `/api/webserver/SesTokInfo` | GET | Composite session cookie and token info |
+| `/api/monitoring/status` | GET | `BatteryPercent`, `BatteryStatus`, `SimStatus`, `SignalIcon`, `CurrentNetworkType`, `CurrentWifiUser`, `ConnectionStatus` |
+| `/api/device/information` | GET | `DeviceName`, `Imei`, `Imsi`, `HardwareVersion`, `SoftwareVersion`, `MacAddress1`, `WanIPAddress` |
+| `/api/wlan/basic-settings` | GET | `WifiSsid`, `WifiHide` |
+| `/api/wlan/security-settings` | GET | `WifiWpaPsk`, `WifiAuthmode`, `WifiKey` |
+
+---
+
+## Screens and User Interface
+
+- **Dashboard Screen**: Displays real-time device health cards, battery progress indicators, signal bar graphs, SIM condition badges, live polling status indicators, and the Demo Mode toggle.
+- **Device Details Screen**: Lists technical hardware specifications, firmware versions, MAC addresses, and network identifiers, accompanied by an input module for manual gateway overrides.
+- **Share Wi-Fi Screen**: Renders the SVG QR code formatted for native mobile camera scanners, displays SSID and masked security keys, and provides a plaintext password copy utility.
+
+---
+
+## Project Structure
+
+```
+mifi/
+├── App.js                         # Root component, navigation setup, theme providers
+├── app.json                       # Expo configuration and project manifest
+├── package.json                   # Project dependencies and script declarations
+├── src/
+│   ├── context/
+│   │   └── RouterContext.js       # React context managing global state and polling
+│   ├── screens/
+│   │   ├── DashboardScreen.js     # Telemetry and status dashboard
+│   │   ├── DeviceDetailsScreen.js # Hardware info and gateway configuration
+│   │   └── ShareWifiScreen.js     # Wi-Fi credentials and QR code sharing
+│   ├── services/
+│   │   ├── RouterAdapter.js       # Base abstract adapter definition
+│   │   ├── HuaweiAdapter.js       # Huawei HiLink XML implementation
+│   │   ├── MockAdapter.js         # Offline simulated adapter
+│   │   └── RouterService.js       # Gateway detector and service singleton
+│   └── theme/
+│       └── theme.js               # Material Design 3 theme definitions
+└── README.md                      # Technical documentation
+```
+
+---
+
+## Tech Stack
+
+- **Runtime & Tooling**: React Native, Expo SDK
+- **Navigation**: React Navigation (Bottom Tabs Navigator)
+- **Component Library**: React Native Paper (Material Design 3)
+- **Vector Icons**: Expo Vector Icons (Material Community Icons)
+- **QR Code Rendering**: `react-native-qrcode-svg`, `react-native-svg`
+- **Data Serialization**: `fast-xml-parser`
+- **System Utilities**: `expo-clipboard`
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js (version 18 or higher recommended)
+- npm or yarn
+- A physical Android or iOS mobile device with the **Expo Go** application installed
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/AlvinMutie/mifi-manager.git
+   cd mifi-manager
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Verify environment compatibility:
+   ```bash
+   npx expo-doctor
+   ```
+
+### Running with Expo Go
+
+1. Launch the Expo Metro bundler:
+   ```bash
+   npx expo start
+   ```
+
+2. Open the application:
+   - **Android**: Launch the **Expo Go** app and select **Scan QR Code** to scan the terminal output.
+   - **iOS**: Open the native **Camera** app, scan the terminal QR code, and tap the prompt to open in Expo Go.
+
+### Connecting to Physical Hardware
+
+To interact with a physical portable MiFi:
+
+1. Ensure the MiFi device is powered on and broadcasting its wireless network.
+2. Connect both your mobile testing phone and your development workstation to the MiFi's Wi-Fi network.
+3. In the application:
+   - Disable the **Simulate Live Data (Demo)** switch on the Dashboard.
+   - Tap **Re-Scan Local Gateways** to initiate auto-detection.
+4. If your router uses a non-standard subnet (such as `192.168.100.1` or `192.168.1.1`), navigate to the **Device Details** screen, input the IP under **Custom Gateway Configuration**, and select **Connect**.
+
+---
+
+## Configuration and Troubleshooting
+
+- **Incompatible SDK Version**: Ensure the Expo SDK specified in `package.json` aligns with the version supported by your installed Expo Go client on mobile. Run `npx expo install --fix` if dependency alignment is required.
+- **Connection Timeouts**: React Native aborts fetch requests when a destination IP is unreachable on the active wireless interface. Verify that the mobile device has not reverted to cellular data and remains connected to the router's local subnet.
+- **Cleartext Traffic**: HiLink administrative interfaces operate over standard HTTP (`http://192.168.8.1`). Expo Go permits local network cleartext traffic by default.
